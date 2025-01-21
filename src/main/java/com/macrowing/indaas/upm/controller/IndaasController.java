@@ -43,6 +43,7 @@ public class IndaasController {
         dblist.add("METRICS_DB");
         dblist.add("INDAAS_MONITOR");
         dblist.add("CLUSTER_DB");
+        dblist.add("INDAAS_ERROR_STORE");
 
     }
 

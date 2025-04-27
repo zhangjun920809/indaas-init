@@ -1,6 +1,8 @@
 package com.macrowing.indaas.upm.utils;
 
 import com.macrowing.indaas.upm.controller.IndaasController;
+import com.macrowing.indaas.upm.entity.ApiConfInfo;
+import com.macrowing.indaas.upm.entity.DatabaseInfo;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -9,14 +11,59 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.sql.*;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class YamlConfigUpdater{
 
     private static Log log = LogFactory.getLog(YamlConfigUpdater.class);
+
+    public static void updateYamlAPIconf(String filePath, ApiConfInfo apiConfInfo)  {
+
+        try{
+            // 读取 YAML 文件
+            Yaml yaml = new Yaml();
+            InputStream inputStream = new FileInputStream(filePath);
+            Map<String, Object> yamlMap = yaml.load(inputStream);
+            inputStream.close();
+
+            // 定位到数据源部分
+//            Map<String, Object> macroDatasources = (Map<String, Object>) yamlMap.get("macro.datasources");
+            Map<String, Object> confmap = (Map<String, Object>) yamlMap.get("api.manager");
+
+            if (confmap != null){
+                confmap.put("hostAndPort",apiConfInfo.getHostAndPort());
+                confmap.put("tokenHostAndPort",apiConfInfo.getTokenHostAndPort());
+                confmap.put("keyAndsecret",apiConfInfo.getKeyAndsecret());
+            } else {
+                HashMap<String, Object> map = new HashMap<>();
+                map.put("hostAndPort",apiConfInfo.getHostAndPort());
+                map.put("tokenHostAndPort",apiConfInfo.getTokenHostAndPort());
+                map.put("keyAndsecret",apiConfInfo.getKeyAndsecret());
+                yamlMap.put("api.manager",map);
+            }
+
+            // 保存更新后的 YAML 文件
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            options.setPrettyFlow(true);
+            Yaml yamlWriter = new Yaml(new Constructor(), new Representer(), options);
+
+            FileWriter writer = new FileWriter(filePath);
+            yamlWriter.dump(yamlMap, writer);
+            writer.close();
+
+           log.info("YAML文件API配置更新成功！");
+        }catch(Exception e){
+            e.printStackTrace();
+            log.error("YAML文件API配置更新失败！" +filePath);
+        }
+    }
 
     public static void updateYaml(String filePath, String host, String port,
                                   String username, String password)  {
@@ -62,11 +109,65 @@ public class YamlConfigUpdater{
             yamlWriter.dump(yamlMap, writer);
             writer.close();
 
-            System.out.println("YAML 文件更新成功！");
+            log.info("YAML文件更新成功！");
         }catch(Exception e){
-            System.out.println("配置文件更新失败！" +filePath);
+            e.printStackTrace();
+            log.error("配置文件更新失败！" +filePath);
         }
 
+    }
+
+
+//    editorconf:
+//    host: 192.168.1.253
+//    port: '9391'
+//    modelconf:
+//    host: 192.168.1.58
+//    port: '8978'
+
+    public static void updateYamlEditorMDCconf(String filePath, String host, String port,String type)  {
+        try{
+            // 读取 YAML 文件
+            Yaml yaml = new Yaml();
+            InputStream inputStream = new FileInputStream(filePath);
+            Map<String, Object> yamlMap = yaml.load(inputStream);
+            inputStream.close();
+
+            if ("editor".equalsIgnoreCase(type)){
+                type = "editorconf";
+            } else {
+                type = "modelconf";
+            }
+
+            // 定位到数据源部分
+//            Map<String, Object> macroDatasources = (Map<String, Object>) yamlMap.get("macro.datasources");
+            Map<String, Object> confmap = (Map<String, Object>) yamlMap.get(type);
+
+            if (confmap != null){
+                confmap.put("host",host);
+                confmap.put("port",port);
+            } else {
+                HashMap<String, Object> map = new HashMap<>();
+                map.put("host",host);
+                map.put("port",port);
+                yamlMap.put(type,map);
+            }
+
+            // 保存更新后的 YAML 文件
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            options.setPrettyFlow(true);
+            Yaml yamlWriter = new Yaml(new Constructor(), new Representer(), options);
+
+            FileWriter writer = new FileWriter(filePath);
+            yamlWriter.dump(yamlMap, writer);
+            writer.close();
+
+            log.info("YAML 文件editor/mdc更新成功！");
+        }catch(Exception e){
+            e.printStackTrace();
+            log.error("YAML 文件editor/mdc更新失败！" +filePath);
+        }
     }
 
     private static String replaceJdbcUrl(String originalUrl, String host, String port) {
@@ -164,6 +265,33 @@ public class YamlConfigUpdater{
 
         return matchingDirectories;
     }
+
+
+    public static List<String> getDirectoriesDMC(String parentPath ) {
+        // 创建结果集合
+        List<String> matchingDirectories = new ArrayList<>();
+
+        // 创建 File 对象表示父目录
+        File parentDir = new File(parentPath);
+
+        // 检查父目录是否存在且是目录
+        if (parentDir.exists() && parentDir.isDirectory()) {
+            // 遍历子文件和子目录
+            File[] files = parentDir.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    // 筛选符合条件的目录
+                    if(file.isDirectory() && file.getName().equalsIgnoreCase("indaasmdc")){
+                        matchingDirectories.add(file.toString() + File.separator +"conf"+ File.separator +"indaasmdc.conf");
+                    }
+                }
+            }
+        } else {
+            log.info("指定路径不是有效的目录：" + parentPath);
+        }
+
+        return matchingDirectories;
+    }
     public static void updateOsgiconfig(String filePath, String host, String port,
                                   String username, String password)  {
         try{
@@ -198,6 +326,65 @@ public class YamlConfigUpdater{
                 log.error(e.getMessage());
         }
     }
+
+    public static void updateMDCconfig(String filePath, String host, String port,
+                                        String username, String password)  {
+        try{
+
+            byte[] bytes = Files.readAllBytes(Paths.get(filePath));
+
+            String configContent = new String(bytes);
+            // 2. 正则替换：URL 的 IP 和端口
+            configContent = replaceUrlHostPort(configContent, host, port);
+
+            // 3. 正则替换：用户名和密码
+            configContent = replaceUserPassword(configContent, username, password);
+
+            try (FileWriter writer = new FileWriter(filePath)) { // 默认覆盖文件
+                writer.write(configContent);
+                log.info("mdc配置文件写入成功！" + filePath);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }catch(Exception e){
+            log.error(e.getMessage());
+        }
+    }
+
+    // 替换 URL 中的 IP 和端口
+    private static String replaceUrlHostPort(String content, String newIp, String newPort) {
+        String regex = "(url:\\s*[\"']jdbc:)([^/:]+)(://)([^/:]+)(:(\\d+)?)?([/\"'][^\"']*[\"'])";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(content);
+        StringBuffer updated = new StringBuffer();
+
+        while (matcher.find()) {
+            String dbType = matcher.group(2);  // 数据库类型（如 mysql）
+            String replacement = matcher.group(1) + dbType + matcher.group(3) + newIp;
+            if (newPort != null && !newPort.isEmpty()) {
+                replacement += ":" + newPort;
+            }
+            replacement += matcher.group(7);   // 保留后续路径
+            matcher.appendReplacement(updated, replacement);
+        }
+        matcher.appendTail(updated);
+        return updated.toString();
+    }
+
+    // 替换用户名和密码
+    private static String replaceUserPassword(String content, String newUser, String newPassword) {
+        // 替换用户名的正则
+        String userRegex = "(user:\\s*[\"'])([^\"']*)([\"'])";
+        content = content.replaceAll(userRegex, "$1" + newUser + "$3");
+
+        // 替换密码的正则
+        String passwordRegex = "(password:\\s*[\"'])([^\"']*)([\"'])";
+        content = content.replaceAll(passwordRegex, "$1" + newPassword + "$3");
+
+        return content;
+    }
+
 }
 
 

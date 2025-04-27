@@ -16,6 +16,9 @@ public class DatabaseInfo {
     @NotNull
     private String password;
 
+    @NotNull
+    private String dbType;
+
 
     @Override
     public String toString() {
@@ -27,6 +30,13 @@ public class DatabaseInfo {
                 '}';
     }
 
+    public String getDbType() {
+        return dbType;
+    }
+
+    public void setDbType(String dbType) {
+        this.dbType = dbType;
+    }
 
     public DatabaseInfo(String host, String port, String username, String password) {
         this.host = host;

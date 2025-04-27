@@ -1,5 +1,8 @@
 package com.macrowing.indaas.upm.controller;
 
+import com.macrowing.indaas.upm.entity.ApiConfInfo;
+import com.macrowing.indaas.upm.entity.ConfInfo;
+import com.macrowing.indaas.upm.utils.DBUtils;
 import com.macrowing.indaas.upm.utils.Response;
 import com.macrowing.indaas.upm.entity.DatabaseInfo;
 import com.macrowing.indaas.upm.entity.UserInfo;
@@ -43,8 +46,69 @@ public class IndaasController {
         dblist.add("METRICS_DB");
         dblist.add("INDAAS_MONITOR");
         dblist.add("CLUSTER_DB");
-        dblist.add("INDAAS_ERROR_STORE");
+        dblist.add("INDAAS_ERROR");
 
+    }
+
+    @PostMapping("/api/conf")
+    public Response updateYamlAPIconf(@RequestBody @Valid ApiConfInfo apiConfInfo) {
+
+        if (apiConfInfo == null || StringUtils.isEmpty(apiConfInfo.getHostAndPort()) || StringUtils.isEmpty(apiConfInfo.getKeyAndsecret())){
+            return Response.error().message("参数不能为空！");
+        }
+        String rootpath ="";
+        // 初始jar包放置于indaas-ad/bin目录
+        // 如果配置文件没有配置项目根目录，则使用indaas-ad/bin/../../作为项目根目录 （即 user.dir/../../）
+        if ("default".equalsIgnoreCase(indaasHome)){
+            rootpath = System.getProperty("user.dir") +File.separator +".."+ File.separator +".." +  File.separator;
+        } else {
+            rootpath = indaasHome;
+        }
+        // 获取dri项目目录,
+        log.info(rootpath);
+        List<String> directoriesWithPrefix = YamlConfigUpdater.getDirectoriesWithPrefix(rootpath);
+        // 处理yaml文件
+        directoriesWithPrefix.forEach(v->{
+            if (v.contains("indaas-ad/conf")){
+                log.info(v);
+                YamlConfigUpdater.updateYamlAPIconf(
+                        v,apiConfInfo);
+            }
+        });
+
+        return Response.ok();
+    }
+
+    @PostMapping("/editormdc/conf")
+    public Response updateYamlEditorMDCconf(@RequestBody @Valid ConfInfo confInfo) {
+
+        if (confInfo == null || StringUtils.isEmpty(confInfo.getHost()) || StringUtils.isEmpty(confInfo.getPort())){
+            return Response.error().message("参数不能为空！");
+        }
+        String rootpath ="";
+        // 初始jar包放置于indaas-ad/bin目录
+        // 如果配置文件没有配置项目根目录，则使用indaas-ad/bin/../../作为项目根目录 （即 user.dir/../../）
+        if ("default".equalsIgnoreCase(indaasHome)){
+            rootpath = System.getProperty("user.dir") +File.separator +".."+ File.separator +".." +  File.separator;
+        } else {
+            rootpath = indaasHome;
+        }
+        // 获取dri项目目录,
+        log.info(rootpath);
+        List<String> directoriesWithPrefix = YamlConfigUpdater.getDirectoriesWithPrefix(rootpath);
+        // 处理yaml文件
+        directoriesWithPrefix.forEach(v->{
+            if (v.contains("indaas-ad/conf")){
+                log.info(v);
+                YamlConfigUpdater.updateYamlEditorMDCconf(
+                        v,
+                        confInfo.getHost().trim(),
+                        confInfo.getPort().trim(),
+                        confInfo.getType().trim());
+            }
+        });
+
+        return Response.ok();
     }
 
     @PostMapping("/database/save")
@@ -87,12 +151,37 @@ public class IndaasController {
                     databaseInfo.getPassword().trim());
         });
 
+        //更新模型中心配置
+        List<String> directoriesmdc = YamlConfigUpdater.getDirectoriesDMC(rootpath);
+        directoriesmdc.forEach(v->{
+            YamlConfigUpdater.updateMDCconfig(
+                    v,
+                    databaseInfo.getHost().trim(),
+                    databaseInfo.getPort().trim(),
+                    databaseInfo.getUsername().trim(),
+                    databaseInfo.getPassword().trim());
+        });
+
         return Response.ok();
     }
 
     @GetMapping("/database")
     public Response getDatabaseInfo() throws Exception {
         HashMap<String, Object> map = new HashMap<>();
+        return Response.ok().data(map);
+    }
+
+
+    @PostMapping("/database/check")
+    public Response check(@RequestBody @Valid DatabaseInfo databaseInfo) {
+
+        if (databaseInfo == null || StringUtils.isEmpty(databaseInfo.getPassword()) || StringUtils.isEmpty(databaseInfo.getUsername()) ||
+                StringUtils.isEmpty(databaseInfo.getHost()) || StringUtils.isEmpty(databaseInfo.getPort())){
+            return Response.error().message("参数不能为空！");
+        }
+        boolean result = DBUtils.checkConnection(databaseInfo);
+        HashMap<String, Object> map = new HashMap<>();
+        map.put("result",result);
         return Response.ok().data(map);
     }
 

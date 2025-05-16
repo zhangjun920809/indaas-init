@@ -50,6 +50,65 @@ public class IndaasController {
 
     }
 
+    /**
+     *  更新yaml配置文件的ip地址（服务地址）
+     * @param ip
+     * @return
+     * @throws Exception
+     */
+    @PostMapping("/updateIPConfig")
+    public Response updateIPConfig(@RequestParam("ip") String ip ) throws Exception {
+        if (ip == null ){
+            return Response.error().message("参数不能为空！");
+        }
+        String rootpath ="";
+        // 初始jar包放置于indaas-ad/bin目录
+        // 如果配置文件没有配置项目根目录，则使用indaas-ad/bin/../../作为项目根目录 （即 user.dir/../../）
+        if ("default".equalsIgnoreCase(indaasHome)){
+            rootpath = System.getProperty("user.dir") +File.separator +".."+ File.separator +".." +  File.separator;
+        } else {
+            rootpath = indaasHome;
+        }
+        // 获取dri项目目录,
+        log.info(rootpath);
+        List<String> directoriesWithPrefix = YamlConfigUpdater.getDirectoriesWithPrefix(rootpath);
+//        List<String> directoriesWithPrefix = new ArrayList<>();
+//        directoriesWithPrefix.add("C:\\Users\\User\\Desktop\\deployment.yaml");
+        // 处理yaml文件
+        directoriesWithPrefix.forEach(v->{
+            log.info(v);
+            YamlConfigUpdater.updateIPConfig(
+                    v,
+                    ip);
+        });
+
+
+        //更新模型中心配置
+//        List<String> directoriesmdc = YamlConfigUpdater.getDirectoriesDMC(rootpath);
+//        directoriesmdc.forEach(v->{
+//            YamlConfigUpdater.updateMDCconfig(
+//                    v,
+//                    databaseInfo.getHost().trim(),
+//                    databaseInfo.getPort().trim(),
+//                    databaseInfo.getUsername().trim(),
+//                    databaseInfo.getPassword().trim());
+//        });
+
+        return Response.ok();
+    }
+
+
+    /**
+     *  获取当前服务器ip列表
+     * @return
+     * @throws Exception
+     */
+    @GetMapping("/getlocalips")
+    public Response getLocalIp() throws Exception {
+        List localIp = YamlConfigUpdater.getLocalIp();
+        return Response.ok().data("iplist",localIp);
+    }
+
     @PostMapping("/api/conf")
     public Response updateYamlAPIconf(@RequestBody @Valid ApiConfInfo apiConfInfo) {
 

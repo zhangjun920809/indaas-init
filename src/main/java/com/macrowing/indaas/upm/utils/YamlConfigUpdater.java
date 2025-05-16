@@ -11,6 +11,9 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.representer.Representer;
 
 import java.io.*;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -22,6 +25,130 @@ import java.util.regex.Pattern;
 public class YamlConfigUpdater{
 
     private static Log log = LogFactory.getLog(YamlConfigUpdater.class);
+
+    public static void main(String[] args) {
+            try {
+                // 遍历所有网络接口
+                for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                    // 过滤条件：接口已启用、非回环、非虚拟
+//                    if (iface.isUp() && !iface.isLoopback() && !iface.isVirtual()) {
+                    if (iface.isUp() && !iface.isLoopback() ) {
+                        // 遍历接口的所有IP地址
+                        for (InetAddress addr : Collections.list(iface.getInetAddresses())) {
+                            // 筛选IPv4地址
+                            if (addr instanceof Inet4Address) {
+                                System.out.println("Server IP: " + addr.getHostAddress());
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            System.out.println("IP地址未找到！");
+    }
+
+    /**
+     *  更新各个配置文件的 ip配置信息
+     * @param filePath
+     * @param host
+     */
+    public static void updateIPConfig(String filePath, String host)  {
+        try{
+            // 读取 YAML 文件
+            Yaml yaml = new Yaml();
+            InputStream inputStream = new FileInputStream(filePath);
+            Map<String, Object> yamlMap = yaml.load(inputStream);
+            inputStream.close();
+
+            try{
+                // 定位到macro.transport.http
+                Map<String, Object> macroTransportHttp = (Map<String, Object>) yamlMap.get("macro.transport.http");
+                List<Map<String, Object>> listenerConfigurations = (List<Map<String, Object>>) macroTransportHttp.get("listenerConfigurations");
+                // 更新host
+                for (Map<String, Object> dataSource : listenerConfigurations) {
+                    dataSource.put("host",host);
+                }
+            }catch(Exception e){
+
+            }
+
+
+            try{
+                // 定位到indaas.stores.query.api
+                Map<String, Object> indaasstoresqueryapi = (Map<String, Object>) yamlMap.get("indaas.stores.query.api");
+                List<Map<String, Object>> listenerConfigurations2 = (List<Map<String, Object>>) indaasstoresqueryapi.get("listenerConfigurations");
+                // 更新host
+                for (Map<String, Object> dataSource : listenerConfigurations2) {
+                    dataSource.put("host",host);
+                }
+            }catch(Exception e){
+
+            }
+
+            try{
+                // 定位到databridge.config
+                Map<String, Object> databridgeconfig = (Map<String, Object>) yamlMap.get("databridge.config");
+                if(databridgeconfig != null){
+                    Object object = databridgeconfig.get("dataReceivers");
+                    if (object != null){
+                        List<Map<String, Object>> dataReceivers = (List<Map<String, Object>>)object;
+                        // 更新host
+                        for (Map<String, Object> temp : dataReceivers) {
+                            Map<String, Object> dataReceiver = (Map<String, Object>)temp.get("dataReceiver");
+                            Map<String, Object> properties = (Map<String, Object>)dataReceiver.get("properties");
+                            if (properties.containsKey("hostName")){
+                                properties.put("hostName",host);
+                            }
+                        }
+                    }
+                }
+            }catch(Exception e){
+
+            }
+
+            // 保存更新后的 YAML 文件
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            options.setPrettyFlow(true);
+            Yaml yamlWriter = new Yaml(new Constructor(), new Representer(), options);
+
+            FileWriter writer = new FileWriter(filePath);
+            yamlWriter.dump(yamlMap, writer);
+            writer.close();
+
+            log.info("YAML文件更新成功！");
+        }catch(Exception e){
+            e.printStackTrace();
+            log.error("配置文件更新失败！" +filePath);
+        }
+
+    }
+
+    public static List getLocalIp(){
+        ArrayList<String> result = new ArrayList<>();
+        try {
+            // 遍历所有网络接口
+            for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                // 过滤条件：接口已启用、非回环、非虚拟
+//                    if (iface.isUp() && !iface.isLoopback() && !iface.isVirtual()) {
+                if (iface.isUp() && !iface.isLoopback() ) {
+                    // 遍历接口的所有IP地址
+                    for (InetAddress addr : Collections.list(iface.getInetAddresses())) {
+                        // 筛选IPv4地址
+                        if (addr instanceof Inet4Address) {
+                            System.out.println("Server IP: " + addr.getHostAddress());
+                            result.add(addr.getHostAddress());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
 
     public static void updateYamlAPIconf(String filePath, ApiConfInfo apiConfInfo)  {
 

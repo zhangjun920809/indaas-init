@@ -50,6 +50,39 @@ public class IndaasController {
 
     }
 
+    @PostMapping("/updateProtocol")
+    public Response updateProtocol(@RequestParam("protocol") String protocol ) throws Exception {
+        if (protocol == null || (!"http".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(protocol))){
+            return Response.error().message("参数有误！");
+        }
+        String rootpath ="";
+        // 初始jar包放置于indaas-ad/bin目录
+        // 如果配置文件没有配置项目根目录，则使用indaas-ad/bin/../../作为项目根目录 （即 user.dir/../../）
+        if ("default".equalsIgnoreCase(indaasHome)){
+            rootpath = System.getProperty("user.dir") +File.separator +".."+ File.separator +".." +  File.separator;
+        } else {
+            rootpath = indaasHome;
+        }
+        // 获取dri项目目录,
+        log.info(rootpath);
+        List<String> directoriesWithPrefix = YamlConfigUpdater.getDirectoriesWithPrefix(rootpath);
+        // 处理yaml文件
+        directoriesWithPrefix.forEach(v->{
+            log.info(v);
+            YamlConfigUpdater.updateProtocol(
+                    v,
+                    protocol);
+        });
+
+        //更新模型中心配置
+        List<String> directoriesmdc = YamlConfigUpdater.getDirectoriesDMC(rootpath);
+        directoriesmdc.forEach(v->{
+            YamlConfigUpdater.updateMDCProtocol(
+                    v,protocol);
+        });
+
+        return Response.ok();
+    }
     /**
      *  更新yaml配置文件的ip地址（服务地址）
      * @param ip
@@ -72,27 +105,12 @@ public class IndaasController {
         // 获取dri项目目录,
         log.info(rootpath);
         List<String> directoriesWithPrefix = YamlConfigUpdater.getDirectoriesWithPrefix(rootpath);
-//        List<String> directoriesWithPrefix = new ArrayList<>();
-//        directoriesWithPrefix.add("C:\\Users\\User\\Desktop\\deployment.yaml");
         // 处理yaml文件
         directoriesWithPrefix.forEach(v->{
-            log.info(v);
             YamlConfigUpdater.updateIPConfig(
                     v,
                     ip);
         });
-
-
-        //更新模型中心配置
-//        List<String> directoriesmdc = YamlConfigUpdater.getDirectoriesDMC(rootpath);
-//        directoriesmdc.forEach(v->{
-//            YamlConfigUpdater.updateMDCconfig(
-//                    v,
-//                    databaseInfo.getHost().trim(),
-//                    databaseInfo.getPort().trim(),
-//                    databaseInfo.getUsername().trim(),
-//                    databaseInfo.getPassword().trim());
-//        });
 
         return Response.ok();
     }

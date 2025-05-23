@@ -38,10 +38,10 @@ public class DBUtils {
         switch (dbType.toLowerCase()) {
             case "mysql":
                 Class.forName("com.mysql.cj.jdbc.Driver");
-                return String.format("jdbc:mysql://%s:%s/mysql?serverTimezone=UTC", ip, port);
+                return String.format("jdbc:mysql://%s:%s?serverTimezone=UTC", ip, port);
             case "postgresql":
                 Class.forName("org.postgresql.Driver");
-                return String.format("jdbc:postgresql://%s:%s/postgres", ip, port);
+                return String.format("jdbc:postgresql://%s:%s", ip, port);
             case "oracle":
                 return String.format("jdbc:oracle:thin:@%s:%s:%s", ip, port);
             case "sqlserver":

@@ -28,27 +28,121 @@ public class YamlConfigUpdater{
 
     public static void main(String[] args) {
             try {
-                // 遍历所有网络接口
-                for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                    // 过滤条件：接口已启用、非回环、非虚拟
-//                    if (iface.isUp() && !iface.isLoopback() && !iface.isVirtual()) {
-                    if (iface.isUp() && !iface.isLoopback() ) {
-                        // 遍历接口的所有IP地址
-                        for (InetAddress addr : Collections.list(iface.getInetAddresses())) {
-                            // 筛选IPv4地址
-                            if (addr instanceof Inet4Address) {
-                                System.out.println("Server IP: " + addr.getHostAddress());
-                                return;
-                            }
-                        }
+                String str = "contentRoot: \"web\",\n" +
+                        "        driversLocation: \"drivers\",\n" +
+                        "\n" +
+                        "        sslConfigurationPath:\"${INDAASMDC_SSL_CONF_PATH}\",\n" +
+                        "\n" +
+                        "        rootURI: \"${INDAASMDC_ROOT_URI:/}\",";
+                String protocol = "http";
+                String replacement;
+                if ("http".equalsIgnoreCase(protocol)) {
+                    replacement = "\\${INDAASMDC_SSL_CONF_PATH}";
+                } else if ("https".equalsIgnoreCase(protocol)) {
+                    replacement = "\\${INDAASMDC_SSL_CONF_PATH:conf/ssl-config.xml}";
+                } else {
+                    throw new IllegalArgumentException("协议必须是 http 或 https");
+                }
+                String regex = "\\$\\{INDAASMDC_SSL_CONF_PATH(:[^}]*)?\\}";
+                String regex1 = "INDAASMDC_SSL_CONF_PATH[:\\w/\\-\\.]*";// 闭合括号和引号
+                final Pattern pattern = Pattern.compile(regex1, Pattern.MULTILINE);
+                final Matcher matcher = pattern.matcher(str);
+
+                String sss = "";
+                while (matcher.find()) {
+                    sss = matcher.group(0);
+                    System.out.println("完整匹配: " + sss);
+
+                    for (int i = 1; i <= matcher.groupCount(); i++) {
+                        System.out.println("组 " + i + ": " + matcher.group(i));
                     }
                 }
+
+                String replace = str.replaceAll(regex, replacement);
+                System.out.println(str);
+                System.out.println(replace);
+                String ss1 = "ni mei";
+                String ss2 = ss1.replace("mei","ma");
+                System.out.println(ss1);
+                System.out.println(ss2);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            System.out.println("IP地址未找到！");
     }
 
+    public static void updateMDCProtocol(String filePath, String protocol)  {
+        try{
+
+            byte[] bytes = Files.readAllBytes(Paths.get(filePath));
+
+            String configContent = new String(bytes);
+            // sslConfigurationPath:"${INDAASMDC_SSL_CONF_PATH:conf/ssl-config.xml}",
+            String replacement;
+            if ("http".equalsIgnoreCase(protocol)) {
+                replacement = "\\${INDAASMDC_SSL_CONF_PATH}";
+            } else if ("https".equalsIgnoreCase(protocol)) {
+                replacement = "\\${INDAASMDC_SSL_CONF_PATH:conf/ssl-config.xml}";
+            } else {
+                throw new IllegalArgumentException("协议必须是 http 或 https");
+            }
+            String regex = "\\$\\{INDAASMDC_SSL_CONF_PATH(:[^}]*)?\\}";
+
+            String replace = configContent.replaceAll(regex, replacement);
+
+            try (FileWriter writer = new FileWriter(filePath)) { // 默认覆盖文件
+                writer.write(replace);
+                log.info("mdc配置文件写入成功！" + filePath);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }catch(Exception e){
+            log.error(e.getMessage());
+        }
+    }
+
+    /**
+     *  更新dri的协议（http  https）
+     * @param filePath
+     * @param protocol
+     */
+    public static void updateProtocol(String filePath, String protocol)  {
+        try{
+            // 读取 YAML 文件
+            Yaml yaml = new Yaml();
+            InputStream inputStream = new FileInputStream(filePath);
+            Map<String, Object> yamlMap = yaml.load(inputStream);
+            inputStream.close();
+
+            try{
+                // 定位到macro.transport.http
+                Map<String, Object> macroTransportHttp = (Map<String, Object>) yamlMap.get("macro.transport.http");
+                List<Map<String, Object>> listenerConfigurations = (List<Map<String, Object>>) macroTransportHttp.get("listenerConfigurations");
+                // 更新host
+                for (Map<String, Object> dataSource : listenerConfigurations) {
+                    dataSource.put("scheme",protocol.trim());
+                }
+            }catch(Exception e){
+
+            }
+
+            // 保存更新后的 YAML 文件
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            options.setPrettyFlow(true);
+            Yaml yamlWriter = new Yaml(new Constructor(), new Representer(), options);
+
+            FileWriter writer = new FileWriter(filePath);
+            yamlWriter.dump(yamlMap, writer);
+            writer.close();
+
+            log.info("YAML文件更新成功！");
+        }catch(Exception e){
+            e.printStackTrace();
+            log.error("配置文件更新失败！" +filePath);
+        }
+
+    }
     /**
      *  更新各个配置文件的 ip配置信息
      * @param filePath
@@ -511,6 +605,8 @@ public class YamlConfigUpdater{
 
         return content;
     }
+
+
 
 }
 
